@@ -1,0 +1,6 @@
+[submodule "deps/ribbon-bridge"]
+	path = deps/ribbon-bridge
+	url = https://github.com/BaroboRobotics/ribbon-bridge
+[submodule "deps/nanopb"]
+	path = deps/nanopb
+	url = https://github.com/nanopb/nanopb
