@@ -1,0 +1,11 @@
+[package]
+name = "ribbon-bridge"
+version = "0.1.0"
+authors = ["David Ko <david@barobo.com>"]
+build = "build.rs"
+
+[build-dependencies]
+protobuf = "*"
+
+[dependencies]
+protobuf = "*"
