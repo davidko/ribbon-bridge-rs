@@ -71,6 +71,21 @@ impl<W:Write> Server<W>{
     }
 
     fn handle_connect(&self) {
+        // Send a "Versions" message back to the client
+        let mut reply = rpc::Reply::new();
+        reply.set_field_type(rpc::Reply_Type::VERSIONS);
+        let mut versions = rpc::Versions::new();
+        let mut triplet = rpc::VersionTriplet::new();
+        triplet.set_major(0);
+        triplet.set_minor(2);
+        triplet.set_patch(2);
+        versions.set_rpc(triplet);
+        let mut triplet = rpc::VersionTriplet::new();
+        triplet.set_major(0);
+        triplet.set_minor(2);
+        triplet.set_patch(2);
+        reply.set_versions(versions);
+        self._server.write( reply.write_to_bytes().unwrap().as_slice() );
     }
 
     fn handle_disconnect(&self) {
