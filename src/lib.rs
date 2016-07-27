@@ -45,6 +45,18 @@ impl<W:Write> Server<W>{
         let cm_result = protobuf::parse_from_bytes::<rpc::ClientMessage>(data.as_slice());
         match cm_result {
             Ok(cm) => {
+                let request = cm.get_request();
+                match request.get_field_type() {
+                    rpc::Request_Type::CONNECT => {
+                        self.handle_connect();
+                    }
+                    rpc::Request_Type::DISCONNECT => {
+                        self.handle_disconnect();
+                    }
+                    rpc::Request_Type::FIRE => {
+                        self.handle_fire( request.get_fire() );
+                    }
+                }
             }
             _ => {
                 // Return error reply
@@ -56,5 +68,14 @@ impl<W:Write> Server<W>{
                 self._server.write( reply.write_to_bytes().unwrap().as_slice() );
             }
         }
+    }
+
+    fn handle_connect(&self) {
+    }
+
+    fn handle_disconnect(&self) {
+    }
+
+    fn handle_fire(&self, fire: &rpc::Request_Fire) {
     }
 }
