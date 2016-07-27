@@ -17,6 +17,15 @@ pub struct Server<W:Write>{
     _server: server_impl::_Server<W>
 }
 
+fn hash(name: &str) -> u32 {
+    let bytes = name.as_bytes();
+    let mut h : u32 = 0;
+    for b in bytes {
+        h = (h.wrapping_mul(101).wrapping_add(*b as u32));
+    }
+    return h;
+}
+
 impl<W:Write> Server<W>{
     fn new() -> Server<W> {
         return Server { _server: server_impl::_Server::new() };
