@@ -1,9 +1,10 @@
 
 use protobuf::Message;
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
-use super::{ReplyHandler, WriteCallback};
 use rpc;
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::{Arc, Mutex};
+use super::{ReplyHandler, WriteCallback};
 
 pub struct ProxyImpl
 {
@@ -31,7 +32,11 @@ impl ProxyImpl
         let mut request = rpc::Request::new();
         request.set_field_type(rpc::Request_Type::CONNECT);
         // Send it
-        self.request(request, Some(Box::new(|_| { println!("Received connect request reply."); })));
+        self.request(request, Some(Box::new(|reply| { 
+            println!("Received connect request reply.");
+            assert!(reply.get_field_type() == rpc::Reply_Type::VERSIONS);
+            println!("Versions: {}", reply.get_versions());
+        })));
         Ok(())
     }
 
@@ -79,5 +84,17 @@ impl ProxyImpl
                 println!("Received broadcast.");
             },
         }
+    }
+}
+
+impl fmt::Display for rpc::VersionTriplet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "v{}.{}.{}", self.get_major(), self.get_minor(), self.get_patch())
+    }
+}
+
+impl fmt::Display for rpc::Versions {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "rpc: {} interface: {}", self.get_rpc(), self.get_interface())
     }
 }
