@@ -6,6 +6,14 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use super::{ReplyHandler, WriteCallback};
 
+fn hash(name: &str) -> u32 {
+    let mut h:u32 = 0;
+    for c in name.bytes() {
+        h = 101*h + (c as u32);
+    }
+    h
+}
+
 pub struct ProxyImpl
 {
     write_cb: Option<Box<WriteCallback>>,
@@ -68,6 +76,22 @@ impl ProxyImpl
         println!("rpc_request end");
     }
 
+    // The payload should be a "In" protobuf message
+    pub fn fire<M>(&mut self, name: &str, payload: &M, cb: Option<ReplyHandler>) 
+        where M: Message
+    {
+        let mut request = rpc::Request::new();
+        request.set_field_type(rpc::Request_Type::FIRE);
+        let mut fire = rpc::Request_Fire::new();
+        fire.set_id( hash(name) );
+        let mut buf:Vec<u8> = vec![];
+        payload.write_to_vec(&mut buf).expect("Could not write protobuf message");
+        fire.set_payload( buf );
+        request.set_fire(fire);
+        self.request(request, cb);
+    }
+
+    // Deliver bytes from RPC Server to this function
     pub fn deliver(&mut self, buf: &[u8]) {
         let mut msg = rpc::ServerMessage::new();
         msg.merge_from_bytes(buf).expect("Could not parse reply payload");
