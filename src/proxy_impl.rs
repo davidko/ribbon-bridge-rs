@@ -3,18 +3,19 @@ use protobuf::Message;
 use std::borrow::Borrow;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use super::ReplyHandler;
+use super::{ReplyHandler, WriteCallback};
 use rpc;
 
-pub struct ProxyImpl<F>
+pub struct ProxyImpl
 {
-    write_cb: Option<Box<F>>,
+    write_cb: Option<Box<WriteCallback>>,
     reply_handlers: Arc<Mutex<HashMap<u32, ReplyHandler>>>, // reply_id, payload
     request_id: u32,
 }
 
-impl <F: FnMut(&[u8]) -> Result<(), String> > ProxyImpl<F> {
-    pub fn new() -> ProxyImpl<F>{
+impl ProxyImpl
+{
+    pub fn new() -> ProxyImpl{
         let proxy = ProxyImpl {
             write_cb: None,
             reply_handlers: Arc::new(Mutex::new(HashMap::new())),
@@ -23,7 +24,8 @@ impl <F: FnMut(&[u8]) -> Result<(), String> > ProxyImpl<F> {
         proxy
     }
 
-    pub fn connect(&mut self, mut write_cb: F) -> Result<(), String> 
+    pub fn connect<W>(&mut self, mut write_cb: W) -> Result<(), String> 
+        where W: FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send
     {
         self.write_cb = Some(Box::new(write_cb));
         // Create a "Connect" request

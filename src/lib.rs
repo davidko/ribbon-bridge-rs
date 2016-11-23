@@ -9,13 +9,7 @@ use std::io::Write;
 use std::io::Read;
 
 type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-    }
-}
+type WriteCallback = FnMut(&[u8])->Result<(), ::std::io::Error>;
 
 pub struct Server<W:Write>{
     _server: server_impl::_Server<W>
@@ -54,13 +48,14 @@ impl<W:Write> Server<W>{
     }
 }
 
-// T: ProxyHandler
-pub struct Proxy<T> {
-    _proxy: proxy_impl::ProxyImpl<T>
+pub struct Proxy
+{
+    _proxy: proxy_impl::ProxyImpl
 }
 
-impl<T: FnMut(&[u8]) -> Result<(), String>> Proxy<T> {
-    pub fn new() -> Proxy<T> {
+impl Proxy
+{
+    pub fn new() -> Proxy {
         let proxy = Proxy {
             _proxy: proxy_impl::ProxyImpl::new(),
         };
@@ -69,7 +64,8 @@ impl<T: FnMut(&[u8]) -> Result<(), String>> Proxy<T> {
 
     // write_callback: This callback is called if/when the Proxy needs to
     // send data to the underlying transport connected to the server.
-    pub fn connect(&mut self, write_callback: T) -> Result<(), String> 
+    pub fn connect<W>(&mut self, write_callback: W) -> Result<(), String> 
+        where W: FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send
     {
         self._proxy.connect(write_callback)
     }
@@ -88,3 +84,19 @@ impl<T: FnMut(&[u8]) -> Result<(), String>> Proxy<T> {
         self._proxy.deliver(buf);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Proxy;
+    struct MyStruct<T> {
+        proxy:T
+    }
+    #[test]
+    fn it_works() {
+        println!("Hello!");
+        let my_struct = MyStruct { proxy: Proxy::new() };
+        let mut proxy = my_struct.proxy;
+        proxy.connect( move |data| { println!("write callback"); Ok(()) } );
+    }
+}
+
