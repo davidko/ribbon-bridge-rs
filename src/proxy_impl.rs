@@ -3,32 +3,29 @@ use protobuf::Message;
 use std::borrow::Borrow;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use super::ProxyHandler;
 use super::ReplyHandler;
 use rpc;
 
-pub struct ProxyImpl<T>
+pub struct ProxyImpl<F>
 {
-    handler: Option<Box<T>>,
+    write_cb: Option<Box<F>>,
     reply_handlers: Arc<Mutex<HashMap<u32, ReplyHandler>>>, // reply_id, payload
     request_id: u32,
 }
 
-impl <T: ProxyHandler> ProxyImpl<T> {
-    pub fn new() -> ProxyImpl<T>{
+impl <F: FnMut(&[u8]) -> Result<(), String> > ProxyImpl<F> {
+    pub fn new() -> ProxyImpl<F>{
         let proxy = ProxyImpl {
-            handler: None,
+            write_cb: None,
             reply_handlers: Arc::new(Mutex::new(HashMap::new())),
             request_id: 0,
         };
         proxy
     }
 
-    pub fn connect<F>(&mut self, mut factory: F) -> Result<(), String> 
-        where F: FnMut() -> T
+    pub fn connect(&mut self, mut write_cb: F) -> Result<(), String> 
     {
-        let handler = factory();
-        self.handler = Some(Box::new(handler));
+        self.write_cb = Some(Box::new(write_cb));
         // Create a "Connect" request
         let mut request = rpc::Request::new();
         request.set_field_type(rpc::Request_Type::CONNECT);
@@ -54,9 +51,9 @@ impl <T: ProxyHandler> ProxyImpl<T> {
         // Turn the client message into a byte stream
         let bytes_vec = cm.write_to_bytes();
 
-        match self.handler {
-            Some(ref mut h) => {
-                h.on_write(&bytes_vec.unwrap().as_slice()).expect("ProxyHandler.on_write() failed");
+        match self.write_cb{
+            Some(ref mut f) => {
+                f(&bytes_vec.unwrap().as_slice()).expect("ProxyHandler.on_write() failed");
             }
             _ => {}
         }

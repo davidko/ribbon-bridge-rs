@@ -59,15 +59,7 @@ pub struct Proxy<T> {
     _proxy: proxy_impl::ProxyImpl<T>
 }
 
-trait ProxyHandler {
-    // Called when proxy receives an RPC broadcast from the server
-    fn on_broadcast(&mut self, bcast: &rpc::Broadcast) { } 
-
-    // Called when the Proxy needs to send data to the underlying transport
-    fn on_write(&mut self, payload: &[u8]) -> Result<(), String>;
-}
-
-impl<T: ProxyHandler> Proxy<T> {
+impl<T: FnMut(&[u8]) -> Result<(), String>> Proxy<T> {
     pub fn new() -> Proxy<T> {
         let proxy = Proxy {
             _proxy: proxy_impl::ProxyImpl::new(),
@@ -75,10 +67,11 @@ impl<T: ProxyHandler> Proxy<T> {
         proxy
     }
 
-    pub fn connect<F>(&mut self, factory: F) -> Result<(), String> 
-        where F: FnMut() -> T
+    // write_callback: This callback is called if/when the Proxy needs to
+    // send data to the underlying transport connected to the server.
+    pub fn connect(&mut self, write_callback: T) -> Result<(), String> 
     {
-        self._proxy.connect(factory)
+        self._proxy.connect(write_callback)
     }
 
 /*
