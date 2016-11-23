@@ -9,7 +9,7 @@ use std::io::Write;
 use std::io::Read;
 
 type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
-type WriteCallback = FnMut(&[u8])->Result<(), ::std::io::Error>;
+type WriteCallback = FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send;
 
 pub struct Server<W:Write>{
     _server: server_impl::_Server<W>
