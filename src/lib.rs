@@ -8,8 +8,8 @@ use protobuf::Message;
 use std::io::Write;
 use std::io::Read;
 
-type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
-type WriteCallback = FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send;
+pub type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
+pub type WriteCallback = FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send;
 
 pub struct Server<W:Write>{
     _server: server_impl::_Server<W>

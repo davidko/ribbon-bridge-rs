@@ -1,6 +1,5 @@
 
 use protobuf::Message;
-use std::borrow::Borrow;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use super::{ReplyHandler, WriteCallback};
@@ -24,7 +23,7 @@ impl ProxyImpl
         proxy
     }
 
-    pub fn connect<W>(&mut self, mut write_cb: W) -> Result<(), String> 
+    pub fn connect<W>(&mut self, write_cb: W) -> Result<(), String> 
         where W: FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send
     {
         self.write_cb = Some(Box::new(write_cb));
@@ -32,7 +31,7 @@ impl ProxyImpl
         let mut request = rpc::Request::new();
         request.set_field_type(rpc::Request_Type::CONNECT);
         // Send it
-        self.request(request, Some(Box::new(|reply| { println!("Received connect request reply."); })));
+        self.request(request, Some(Box::new(|_| { println!("Received connect request reply."); })));
         Ok(())
     }
 
