@@ -1,3 +1,4 @@
+extern crate futures;
 extern crate protobuf;
 
 mod server_impl;
@@ -10,6 +11,8 @@ use std::io::Read;
 
 pub type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
 pub type WriteCallback = FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send;
+
+pub type ReplyFuture = futures::BoxFuture<rpc::Reply, futures::Canceled>;
 
 pub struct Server<W:Write>{
     _server: server_impl::_Server<W>
