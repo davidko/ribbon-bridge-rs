@@ -74,6 +74,12 @@ impl Proxy
         self._proxy.connect(write_callback)
     }
 
+    pub fn fire<M>(&mut self, name: &str, payload: &M) -> ReplyFuture
+        where M: Message
+    {
+        self._proxy.fire(name, payload)
+    }
+
 /*
     pub fn fire<M, F>(&mut self, name: &str, message: &M, callback: F)
         where M: ::protobuf::Message,

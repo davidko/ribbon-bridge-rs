@@ -43,22 +43,6 @@ impl ProxyImpl
         request.set_field_type(rpc::Request_Type::CONNECT);
         self.request(request)
 
-        // Send it
-        /*
-        self.request(request).then(|result| {
-            match result {
-                Ok(ref reply) => {
-                    println!("Received connect request reply.");
-                    assert!(reply.get_field_type() == rpc::Reply_Type::VERSIONS);
-                    println!("Versions: {}", reply.get_versions());
-                },
-                Err(y) => {
-                    println!("RPC Proxy connect failed.");
-                }
-            }
-            result
-        });
-        */
     }
 
     pub fn request(&mut self, request: rpc::Request) -> ReplyFuture {
