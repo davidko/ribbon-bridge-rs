@@ -34,21 +34,7 @@ impl<W:Write> Server<W>{
 
     fn deliver(&mut self, data: Vec<u8>)
     {
-        // 'data' should be a 'ClientMessage'
-        let cm_result = protobuf::parse_from_bytes::<rpc::ClientMessage>(data.as_slice());
-        match cm_result {
-            Ok(cm) => {
-            }
-            _ => {
-                // Return error reply
-                let mut reply = rpc::Reply::new();
-                let mut status = rpc::Reply_Status::new();
-                status.set_value(rpc::Status::DECODING_FAILURE);
-                reply.set_field_type(rpc::Reply_Type::STATUS);
-                reply.set_status(status);
-                self._server.write( reply.write_to_bytes().unwrap().as_slice() );
-            }
-        }
+        self._server.deliver(data.as_slice())
     }
 }
 
