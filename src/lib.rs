@@ -1,3 +1,4 @@
+extern crate core;
 extern crate futures;
 extern crate protobuf;
 
@@ -67,7 +68,7 @@ impl Proxy
 
     // write_callback: This callback is called if/when the Proxy needs to
     // send data to the underlying transport connected to the server.
-    pub fn connect<W>(&mut self, write_callback: W) -> Result<(), String> 
+    pub fn connect<W>(&mut self, write_callback: W) -> ReplyFuture
         where W: FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send
     {
         self._proxy.connect(write_callback)

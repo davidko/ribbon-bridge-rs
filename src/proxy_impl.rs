@@ -34,14 +34,17 @@ impl ProxyImpl
         proxy
     }
 
-    pub fn connect<W>(&mut self, write_cb: W) -> Result<(), String> 
+    pub fn connect<W>(&mut self, write_cb: W) -> ReplyFuture
         where W: FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send
     {
         self.write_cb = Some(Box::new(write_cb));
         // Create a "Connect" request
         let mut request = rpc::Request::new();
         request.set_field_type(rpc::Request_Type::CONNECT);
+        self.request(request)
+
         // Send it
+        /*
         self.request(request).then(|result| {
             match result {
                 Ok(ref reply) => {
@@ -55,13 +58,13 @@ impl ProxyImpl
             }
             result
         });
-        Ok(())
+        */
     }
 
     pub fn request(&mut self, request: rpc::Request) -> ReplyFuture {
         println!("rpc_request start");
         // Add the callback reply handler
-        let (tx, rx) = futures::oneshot();
+        let (tx, rx) = futures::sync::oneshot::channel();
         let ref mut map = self.reply_handlers.lock().unwrap();
         map.insert(self.request_id, tx);
 
@@ -107,10 +110,12 @@ impl ProxyImpl
         msg.merge_from_bytes(buf).expect("Could not parse reply payload");
         match msg.get_field_type() {
             rpc::ServerMessage_Type::REPLY => {
+                println!("Got rpc reply.");
                 // See if there is a reply handler in our hashmap
                 let id = msg.get_inReplyTo();
                 let mut hashmap = self.reply_handlers.lock().unwrap();
                 if let Some(cb) = hashmap.remove(&id) {
+                    println!("Resolving RPC reply future.");
                     cb.complete(msg.take_reply());
                 }
             },
