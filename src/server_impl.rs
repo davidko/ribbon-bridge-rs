@@ -27,7 +27,7 @@ impl _Server {
         self.fire_handlers.insert(hash(name), Box::new(func));
     }
 
-    pub fn write(&mut self, buf: &[u8]) -> Result<(), ::std::io::Error> {
+    pub fn write(&mut self, buf: Vec<u8>) -> Result<(), ::std::io::Error> {
         match self.write_cb{
             Some(ref mut f) => {
                 f(buf)
@@ -40,10 +40,10 @@ impl _Server {
         }
     }
 
-    pub fn deliver(&mut self, data: &[u8])
+    pub fn deliver(&mut self, data: Vec<u8>)
     {
         // 'data' should be a 'ClientMessage'
-        let cm_result = protobuf::parse_from_bytes::<rpc::ClientMessage>(data);
+        let cm_result = protobuf::parse_from_bytes::<rpc::ClientMessage>(data.as_slice());
         match cm_result {
             Ok(cm) => {
                 /* Need to match the type of request */
@@ -66,6 +66,12 @@ impl _Server {
                 self.send_reply(reply, 0);
             }
         }
+    }
+
+    pub fn set_write_callback<W>(&mut self, write_callback: W)
+        where W: FnMut(Vec<u8>)->Result<(), ::std::io::Error> + 'static + Send
+    {
+        self.write_cb = Some(Box::new(write_callback));
     }
 
     fn reply_versions(&mut self, in_reply_to: u32) {
@@ -94,7 +100,7 @@ impl _Server {
         sm.set_field_type(rpc::ServerMessage_Type::REPLY);
         sm.set_reply(reply);
         sm.set_inReplyTo(in_reply_to);
-        self.write( sm.write_to_bytes().unwrap().as_slice() );
+        self.write( sm.write_to_bytes().unwrap() );
     }
 
     fn send_result(&mut self, result_payload: Vec<u8>, in_reply_to: u32)
@@ -108,7 +114,10 @@ impl _Server {
         self.send_reply(reply, in_reply_to);
     }
 
-    fn handle_fire(&mut self, fire_id: u32, request_id: u32, payload: &[u8]) {
+    fn handle_fire(&mut self, fire_id: u32, request_id: u32, payload: Vec<u8>) {
+        // We have to completely remove the item. If we get a reference to the 
+        // item inside, the borrow checker will complain because it can't 
+        // guarantee that the item won't live longer than "self"
         match self.fire_handlers.remove(&fire_id){
             Some(func) => {
                 match func(payload.to_vec()) {

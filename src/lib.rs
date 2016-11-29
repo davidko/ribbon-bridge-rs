@@ -12,7 +12,7 @@ use std::io::Read;
 
 pub type FireHandler = Fn(Vec<u8>) -> Result<Vec<u8>, rpc::Status>;
 pub type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
-pub type WriteCallback = FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send;
+pub type WriteCallback = FnMut(Vec<u8>)->Result<(), ::std::io::Error> + 'static + Send;
 
 pub type ReplyFuture = futures::BoxFuture<rpc::Reply, futures::Canceled>;
 
@@ -24,26 +24,35 @@ fn hash(name: &str) -> u32 {
     h
 }
 
+
 pub struct Server{
     _server: server_impl::_Server
 }
 
+unsafe impl Send for Server {}
+
 impl Server{
-    fn new() -> Server {
+    pub fn new() -> Server {
         return Server { _server: server_impl::_Server::new() };
     }
 
     // Register a function to be called to handle FIRE requests
-    fn on<F>(&mut self, name: &str, func: F)
+    pub fn on<F>(&mut self, name: &str, func: F)
         where F: Fn(Vec<u8>) -> Result<Vec<u8>, rpc::Status>,
               F: 'static
     {
         self._server.on(name, func);
     }
 
-    fn deliver(&mut self, data: Vec<u8>)
+    pub fn deliver(&mut self, data: Vec<u8>)
     {
-        self._server.deliver(data.as_slice())
+        self._server.deliver(data)
+    }
+
+    pub fn set_write_callback<W>(&mut self, write_callback: W)
+        where W: FnMut(Vec<u8>)->Result<(), ::std::io::Error> + 'static + Send
+    {
+        self._server.set_write_callback(write_callback)
     }
 }
 
@@ -51,6 +60,8 @@ pub struct Proxy
 {
     _proxy: proxy_impl::ProxyImpl
 }
+
+unsafe impl Send for Proxy {}
 
 impl Proxy
 {
@@ -64,7 +75,7 @@ impl Proxy
     // write_callback: This callback is called if/when the Proxy needs to
     // send data to the underlying transport connected to the server.
     pub fn connect<W>(&mut self, write_callback: W) -> ReplyFuture
-        where W: FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send
+        where W: FnMut(Vec<u8>)->Result<(), ::std::io::Error> + 'static + Send
     {
         self._proxy.connect(write_callback)
     }
@@ -85,7 +96,7 @@ impl Proxy
     */
     
     // Deliver data from underlying transport to here
-    pub fn deliver(&mut self, buf: &[u8]) {
+    pub fn deliver(&mut self, buf: Vec<u8>) {
         self._proxy.deliver(buf);
     }
 }

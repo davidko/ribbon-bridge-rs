@@ -27,7 +27,7 @@ impl ProxyImpl
     }
 
     pub fn connect<W>(&mut self, write_cb: W) -> ReplyFuture
-        where W: FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send
+        where W: FnMut(Vec<u8>)->Result<(), ::std::io::Error> + 'static + Send
     {
         self.write_cb = Some(Box::new(write_cb));
         // Create a "Connect" request
@@ -55,7 +55,7 @@ impl ProxyImpl
 
         match self.write_cb{
             Some(ref mut f) => {
-                f(&bytes_vec.unwrap().as_slice()).expect("ProxyHandler.on_write() failed");
+                f(bytes_vec.unwrap()).expect("ProxyHandler.on_write() failed");
             }
             _ => {}
         }
@@ -81,9 +81,9 @@ impl ProxyImpl
     }
 
     // Deliver bytes from RPC Server to this function
-    pub fn deliver(&mut self, buf: &[u8]) {
+    pub fn deliver(&mut self, buf: Vec<u8>) {
         let mut msg = rpc::ServerMessage::new();
-        msg.merge_from_bytes(buf).expect("Could not parse reply payload");
+        msg.merge_from_bytes(buf.as_slice()).expect("Could not parse reply payload");
         match msg.get_field_type() {
             rpc::ServerMessage_Type::REPLY => {
                 println!("Got rpc reply.");
