@@ -109,13 +109,12 @@ impl _Server {
     }
 
     fn handle_fire(&mut self, fire_id: u32, request_id: u32, payload: &[u8]) {
-        let ref mut hashmap = self.fire_handlers;
-        let mut fire_handler = hashmap.get(&fire_id);
-        match fire_handler {
+        match self.fire_handlers.remove(&fire_id){
             Some(func) => {
                 match func(payload.to_vec()) {
                     Ok(result_payload) => {
                         self.send_result(result_payload, request_id);
+                        self.fire_handlers.insert(fire_id, func);
                     },
                     Err(err_code) => {
                         let mut reply_status = rpc::Reply_Status::new();
@@ -124,7 +123,8 @@ impl _Server {
                         let mut reply = rpc::Reply::new();
                         reply.set_field_type(rpc::Reply_Type::STATUS);
                         reply.set_status(reply_status);
-                        //self.send_reply(reply, request_id);
+                        self.send_reply(reply, request_id);
+                        self.fire_handlers.insert(fire_id, func);
                     },
                 }
             }
