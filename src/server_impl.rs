@@ -49,10 +49,14 @@ impl _Server {
                 /* Need to match the type of request */
                 match cm.get_request().get_field_type() {
                     rpc::Request_Type::CONNECT => {
+                        // Reply with versions
+                        self.reply_versions(cm.get_id());
                     }
                     rpc::Request_Type::DISCONNECT => {
+                        unimplemented!();
                     }
                     rpc::Request_Type::FIRE => {
+                        unimplemented!();
                     }
                 }
             }
