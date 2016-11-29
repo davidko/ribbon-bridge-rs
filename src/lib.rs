@@ -15,6 +15,14 @@ pub type WriteCallback = FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + 
 
 pub type ReplyFuture = futures::BoxFuture<rpc::Reply, futures::Canceled>;
 
+fn hash(name: &str) -> u32 {
+    let mut h:u32 = 0;
+    for c in name.bytes() {
+        h = 101*h + (c as u32);
+    }
+    h
+}
+
 pub struct Server<W:Write>{
     _server: server_impl::_Server<W>
 }
@@ -25,7 +33,7 @@ impl<W:Write> Server<W>{
     }
 
     // Register a function to be called to handle FIRE requests
-    fn on<F>(&mut self, name: String, func: F)
+    fn on<F>(&mut self, name: &str, func: F)
         where F: FnMut(Vec<u8>) -> Vec<u8>,
               F: 'static
     {

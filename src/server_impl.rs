@@ -4,9 +4,10 @@ use rpc;
 use std::collections::HashMap;
 use std::io::Write;
 use std::io;
+use super::hash;
 
 pub struct _Server<S:Write> {
-    fire_handlers: HashMap<String, Box<FnMut(Vec<u8>) -> Vec<u8>>>,
+    fire_handlers: HashMap<u32, Box<FnMut(Vec<u8>) -> Vec<u8>>>,
     stream: Option<S>
 }
 
@@ -18,10 +19,11 @@ impl<S:Write> _Server<S> {
         }
     }
 
-    pub fn on<F>(&mut self, name: String, func: F) 
+    // func: Return a rpc::Reply::Result::payload Vec<u8>
+    pub fn on<F>(&mut self, name: &str, func: F) 
         where F: FnMut(Vec<u8>) -> Vec<u8>,
               F: 'static {
-        self.fire_handlers.insert(name, Box::new(func));
+        self.fire_handlers.insert(hash(name), Box::new(func));
     }
 
     pub fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -88,4 +90,22 @@ impl<S:Write> _Server<S> {
         self.write( sm.write_to_bytes().unwrap().as_slice() );
     }
 
+    fn send_result(&mut self, result_payload: Vec<u8>, in_reply_to: u32)
+    {
+        let mut result = rpc::Reply_Result::new();
+        result.set_payload(result_payload);
+        
+        let mut reply = rpc::Reply::new();
+        reply.set_field_type(rpc::Reply_Type::RESULT);
+        reply.set_result(result);
+        self.send_reply(reply, in_reply_to);
+    }
+
+    fn handle_fire(&mut self, fire_id: u32, request_id: u32, payload: &[u8]) {
+        match self.fire_handlers.get(&fire_id) {
+            Some(func) => {
+            }
+            None => {}
+        }
+    }
 }

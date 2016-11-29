@@ -6,15 +6,7 @@ use rpc;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
-use super::{ReplyHandler, WriteCallback, ReplyFuture};
-
-fn hash(name: &str) -> u32 {
-    let mut h:u32 = 0;
-    for c in name.bytes() {
-        h = 101*h + (c as u32);
-    }
-    h
-}
+use super::{ReplyHandler, WriteCallback, ReplyFuture, hash};
 
 pub struct ProxyImpl
 {
