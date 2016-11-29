@@ -4,32 +4,39 @@ use rpc;
 use std::collections::HashMap;
 use std::io::Write;
 use std::io;
-use super::hash;
+use super::{hash, FireHandler, WriteCallback};
 
-pub struct _Server<S:Write> {
-    fire_handlers: HashMap<u32, Box<FnMut(Vec<u8>) -> Vec<u8>>>,
-    stream: Option<S>
+pub struct _Server {
+    fire_handlers: HashMap<u32, Box<FireHandler>>,
+    write_cb: Option<Box<WriteCallback>>,
 }
 
-impl<S:Write> _Server<S> {
-    pub fn new() -> _Server<S> {
+impl _Server {
+    pub fn new() -> _Server {
         return _Server {
             fire_handlers : HashMap::new(),
-            stream: None
+            write_cb: None
         }
     }
 
     // func: Return a rpc::Reply::Result::payload Vec<u8>
     pub fn on<F>(&mut self, name: &str, func: F) 
-        where F: FnMut(Vec<u8>) -> Vec<u8>,
-              F: 'static {
+        where F: Fn(Vec<u8>) -> Result<Vec<u8>, rpc::Status>,
+              F: 'static 
+    {
         self.fire_handlers.insert(hash(name), Box::new(func));
     }
 
-    pub fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.stream {
-            Some(ref mut stream) => { return stream.write(buf); }
-            None => { return Err(io::Error::new(io::ErrorKind::Other, "No available write stream.")); }
+    pub fn write(&mut self, buf: &[u8]) -> Result<(), ::std::io::Error> {
+        match self.write_cb{
+            Some(ref mut f) => {
+                f(buf)
+            }
+            None => {
+                Err(::std::io::Error::new(
+                    ::std::io::ErrorKind::Other, 
+                    "No write callback has been set."))
+            }
         }
     }
 
@@ -102,10 +109,27 @@ impl<S:Write> _Server<S> {
     }
 
     fn handle_fire(&mut self, fire_id: u32, request_id: u32, payload: &[u8]) {
-        match self.fire_handlers.get(&fire_id) {
+        let ref mut hashmap = self.fire_handlers;
+        let mut fire_handler = hashmap.get(&fire_id);
+        match fire_handler {
             Some(func) => {
+                match func(payload.to_vec()) {
+                    Ok(result_payload) => {
+                        self.send_result(result_payload, request_id);
+                    },
+                    Err(err_code) => {
+                        let mut reply_status = rpc::Reply_Status::new();
+                        reply_status.set_value(err_code);
+
+                        let mut reply = rpc::Reply::new();
+                        reply.set_field_type(rpc::Reply_Type::STATUS);
+                        reply.set_status(reply_status);
+                        //self.send_reply(reply, request_id);
+                    },
+                }
             }
             None => {}
         }
     }
+
 }

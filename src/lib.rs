@@ -10,6 +10,7 @@ use protobuf::Message;
 use std::io::Write;
 use std::io::Read;
 
+pub type FireHandler = Fn(Vec<u8>) -> Result<Vec<u8>, rpc::Status>;
 pub type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
 pub type WriteCallback = FnMut(&[u8])->Result<(), ::std::io::Error> + 'static + Send;
 
@@ -23,18 +24,18 @@ fn hash(name: &str) -> u32 {
     h
 }
 
-pub struct Server<W:Write>{
-    _server: server_impl::_Server<W>
+pub struct Server{
+    _server: server_impl::_Server
 }
 
-impl<W:Write> Server<W>{
-    fn new() -> Server<W> {
+impl Server{
+    fn new() -> Server {
         return Server { _server: server_impl::_Server::new() };
     }
 
     // Register a function to be called to handle FIRE requests
     fn on<F>(&mut self, name: &str, func: F)
-        where F: FnMut(Vec<u8>) -> Vec<u8>,
+        where F: Fn(Vec<u8>) -> Result<Vec<u8>, rpc::Status>,
               F: 'static
     {
         self._server.on(name, func);
