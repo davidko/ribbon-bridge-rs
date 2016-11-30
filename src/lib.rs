@@ -15,11 +15,12 @@ pub type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
 pub type WriteCallback = FnMut(Vec<u8>)->Result<(), ::std::io::Error> + 'static + Send;
 
 pub type ReplyFuture = futures::BoxFuture<rpc::Reply, futures::Canceled>;
+pub type ResultFuture = futures::BoxFuture<Vec<u8>, futures::Canceled>;
 
 fn hash(name: &str) -> u32 {
     let mut h:u32 = 0;
     for c in name.bytes() {
-        h = 101*h + (c as u32);
+        h = 101u32.wrapping_mul(h).wrapping_add(c as u32);
     }
     h
 }
@@ -80,8 +81,7 @@ impl Proxy
         self._proxy.connect(write_callback)
     }
 
-    pub fn fire<M>(&mut self, name: &str, payload: &M) -> ReplyFuture
-        where M: Message
+    pub fn fire(&mut self, name: &str, payload: Vec<u8>) -> ResultFuture
     {
         self._proxy.fire(name, payload)
     }

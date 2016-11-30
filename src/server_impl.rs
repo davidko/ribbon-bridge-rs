@@ -45,7 +45,7 @@ impl _Server {
         // 'data' should be a 'ClientMessage'
         let cm_result = protobuf::parse_from_bytes::<rpc::ClientMessage>(data.as_slice());
         match cm_result {
-            Ok(cm) => {
+            Ok(mut cm) => {
                 /* Need to match the type of request */
                 match cm.get_request().get_field_type() {
                     rpc::Request_Type::CONNECT => {
@@ -56,7 +56,9 @@ impl _Server {
                         unimplemented!();
                     }
                     rpc::Request_Type::FIRE => {
-                        unimplemented!();
+                        let request_id = cm.get_id();
+                        let mut fire = cm.take_request().take_fire();
+                        self.handle_fire(fire.get_id(), request_id, fire.take_payload());
                     }
                 }
             }

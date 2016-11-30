@@ -40,10 +40,17 @@ fn integration_test() {
             println!("Server write callback done.");
             Ok(())
         });
+        // Set up a fake fire-able method
+        server.on("my-method", |buf| {
+            println!("Fire my-method!");
+            assert!(buf == vec![3,2,1]);
+            Ok(vec![1,2,3])
+        });
     }
 
-    // Set up proxy listen pump
 
+
+    // Set up proxy listen pump
     let proxy = Arc::new(Mutex::new(rb::Proxy::new()));
 
     {
@@ -81,6 +88,20 @@ fn integration_test() {
                 Err(error) => {
                 },
             }
+
+            /* Try firing a method */
+            let fut = 
+            {
+                let mut proxy = proxy.lock().unwrap();
+                proxy.fire("my-method", vec![3,2,1])
+            };
+            match fut.wait() {
+                Ok(reply) => {
+                    assert!(reply == vec![1,2,3]);
+                }
+                _ => { panic!("Received error response."); }
+            }
+
         });
         thread.join();
     }

@@ -6,7 +6,7 @@ use rpc;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
-use super::{ReplyHandler, WriteCallback, ReplyFuture, hash};
+use super::{ReplyHandler, WriteCallback, ReplyFuture, ResultFuture, hash};
 
 pub struct ProxyImpl
 {
@@ -66,18 +66,22 @@ impl ProxyImpl
     }
 
     // The payload should be a "In" protobuf message
-    pub fn fire<M>(&mut self, name: &str, payload: &M) -> ReplyFuture
-        where M: Message
+    pub fn fire(&mut self, name: &str, payload: Vec<u8>) -> ResultFuture
     {
         let mut request = rpc::Request::new();
         request.set_field_type(rpc::Request_Type::FIRE);
         let mut fire = rpc::Request_Fire::new();
         fire.set_id( hash(name) );
-        let mut buf:Vec<u8> = vec![];
-        payload.write_to_vec(&mut buf).expect("Could not write protobuf message");
-        fire.set_payload( buf );
+        fire.set_payload( payload );
         request.set_fire(fire);
-        self.request(request)
+        self.request(request).map( |mut reply| {
+            match reply.get_field_type() {
+                rpc::Reply_Type::RESULT => {
+                    reply.take_result().take_payload()
+                },
+                _ => {vec![]}
+            }
+        }).boxed()
     }
 
     // Deliver bytes from RPC Server to this function
