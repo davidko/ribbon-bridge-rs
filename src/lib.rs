@@ -4,7 +4,7 @@ extern crate protobuf;
 
 mod server_impl;
 mod proxy_impl;
-mod rpc;
+pub mod rpc;
 
 use std::io;
 
