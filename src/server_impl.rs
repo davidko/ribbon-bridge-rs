@@ -1,9 +1,8 @@
 use protobuf;
 use protobuf::Message;
 use rpc;
-use std::collections::HashMap;
-use std::io::Write;
 use std::io;
+use std::collections::HashMap;
 use super::{hash, FireHandler, WriteCallback};
 
 pub struct _Server {
@@ -27,30 +26,33 @@ impl _Server {
         self.fire_handlers.insert(hash(name), Box::new(func));
     }
 
-    pub fn write(&mut self, buf: Vec<u8>) -> Result<(), ::std::io::Error> {
+    pub fn write(&mut self, buf: Vec<u8>) -> Result<Option<Vec<u8>>, ::std::io::Error> {
         match self.write_cb{
             Some(ref mut f) => {
-                f(buf)
+                match f(buf) {
+                    Ok(_) => Ok(None),
+                    Err(e) => Err(e),
+                }
             }
             None => {
-                Err(::std::io::Error::new(
-                    ::std::io::ErrorKind::Other, 
-                    "No write callback has been set."))
+                Ok(Some(buf))
             }
         }
     }
 
-    pub fn deliver(&mut self, data: Vec<u8>)
+    // Deliver bytes from the proxy to here. If there is no write callback, data which should be
+    // sent back to the proxy is returned as Option<Vec<u8>>.
+    pub fn deliver(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, io::Error>
     {
         // 'data' should be a 'ClientMessage'
         let cm_result = protobuf::parse_from_bytes::<rpc::ClientMessage>(data.as_slice());
-        match cm_result {
+        return match cm_result {
             Ok(mut cm) => {
                 /* Need to match the type of request */
                 match cm.get_request().get_field_type() {
                     rpc::Request_Type::CONNECT => {
                         // Reply with versions
-                        self.reply_versions(cm.get_id());
+                        self.reply_versions(cm.get_id())
                     }
                     rpc::Request_Type::DISCONNECT => {
                         unimplemented!();
@@ -58,7 +60,7 @@ impl _Server {
                     rpc::Request_Type::FIRE => {
                         let request_id = cm.get_id();
                         let mut fire = cm.take_request().take_fire();
-                        self.handle_fire(fire.get_id(), request_id, fire.take_payload());
+                        self.handle_fire(fire.get_id(), request_id, fire.take_payload())
                     }
                 }
             }
@@ -69,7 +71,7 @@ impl _Server {
                 status.set_value(rpc::Status::DECODING_FAILURE);
                 reply.set_field_type(rpc::Reply_Type::STATUS);
                 reply.set_status(status);
-                self.send_reply(reply, 0);
+                self.send_reply(reply, 0)
             }
         }
     }
@@ -80,7 +82,7 @@ impl _Server {
         self.write_cb = Some(Box::new(write_callback));
     }
 
-    fn reply_versions(&mut self, in_reply_to: u32) {
+    fn reply_versions(&mut self, in_reply_to: u32) -> Result<Option<Vec<u8>>, io::Error> {
         let mut rpc_version = rpc::VersionTriplet::new();
         rpc_version.set_major(0);
         rpc_version.set_minor(0);
@@ -97,19 +99,19 @@ impl _Server {
         versions.set_interface(interface_version);
         reply.set_field_type(rpc::Reply_Type::VERSIONS);
         reply.set_versions(versions);
-        self.send_reply(reply, in_reply_to);
+        self.send_reply(reply, in_reply_to)
     }
 
-    fn send_reply(&mut self, reply: rpc::Reply, in_reply_to: u32)
+    fn send_reply(&mut self, reply: rpc::Reply, in_reply_to: u32) -> Result<Option<Vec<u8>>, io::Error>
     {
         let mut sm = rpc::ServerMessage::new();
         sm.set_field_type(rpc::ServerMessage_Type::REPLY);
         sm.set_reply(reply);
         sm.set_inReplyTo(in_reply_to);
-        self.write( sm.write_to_bytes().unwrap() );
+        self.write( sm.write_to_bytes().unwrap() )
     }
 
-    fn send_result(&mut self, result_payload: Vec<u8>, in_reply_to: u32)
+    fn send_result(&mut self, result_payload: Vec<u8>, in_reply_to: u32) -> Result<Option<Vec<u8>>, io::Error>
     {
         let mut result = rpc::Reply_Result::new();
         result.set_payload(result_payload);
@@ -117,10 +119,12 @@ impl _Server {
         let mut reply = rpc::Reply::new();
         reply.set_field_type(rpc::Reply_Type::RESULT);
         reply.set_result(result);
-        self.send_reply(reply, in_reply_to);
+        self.send_reply(reply, in_reply_to)
     }
 
-    fn handle_fire(&mut self, fire_id: u32, request_id: u32, payload: Vec<u8>) {
+    fn handle_fire(&mut self, fire_id: u32, request_id: u32, payload: Vec<u8>) 
+       -> Result<Option<Vec<u8>>, io::Error>
+    {
         // We have to completely remove the item. If we get a reference to the 
         // item inside, the borrow checker will complain because it can't 
         // guarantee that the item won't live longer than "self"
@@ -128,8 +132,8 @@ impl _Server {
             Some(func) => {
                 match func(payload.to_vec()) {
                     Ok(result_payload) => {
-                        self.send_result(result_payload, request_id);
                         self.fire_handlers.insert(fire_id, func);
+                        self.send_result(result_payload, request_id)
                     },
                     Err(err_code) => {
                         let mut reply_status = rpc::Reply_Status::new();
@@ -138,12 +142,20 @@ impl _Server {
                         let mut reply = rpc::Reply::new();
                         reply.set_field_type(rpc::Reply_Type::STATUS);
                         reply.set_status(reply_status);
-                        self.send_reply(reply, request_id);
                         self.fire_handlers.insert(fire_id, func);
+                        self.send_reply(reply, request_id)
                     },
                 }
             }
-            None => {}
+            None => {
+                let mut reply_status = rpc::Reply_Status::new();
+                reply_status.set_value(rpc::Status::INTERFACE_ERROR);
+
+                let mut reply = rpc::Reply::new();
+                reply.set_field_type(rpc::Reply_Type::STATUS);
+                reply.set_status(reply_status);
+                self.send_reply(reply, request_id)
+            }
         }
     }
 

@@ -6,9 +6,7 @@ mod server_impl;
 mod proxy_impl;
 mod rpc;
 
-use protobuf::Message;
-use std::io::Write;
-use std::io::Read;
+use std::io;
 
 pub type FireHandler = Fn(Vec<u8>) -> Result<Vec<u8>, rpc::Status>;
 pub type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
@@ -45,7 +43,7 @@ impl Server{
         self._server.on(name, func);
     }
 
-    pub fn deliver(&mut self, data: Vec<u8>)
+    pub fn deliver(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, io::Error>
     {
         self._server.deliver(data)
     }
@@ -82,9 +80,9 @@ impl Proxy
     }
 
     pub fn fire(&mut self, name: &str, payload: Vec<u8>) -> ResultFuture
-    {
-        self._proxy.fire(name, payload)
-    }
+{
+    self._proxy.fire(name, payload)
+}
 
 /*
     pub fn fire<M, F>(&mut self, name: &str, message: &M, callback: F)

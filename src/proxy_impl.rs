@@ -6,7 +6,7 @@ use rpc;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
-use super::{ReplyHandler, WriteCallback, ReplyFuture, ResultFuture, hash};
+use super::{WriteCallback, ReplyFuture, ResultFuture, hash};
 
 pub struct ProxyImpl
 {
