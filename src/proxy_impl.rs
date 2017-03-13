@@ -10,7 +10,7 @@ use super::{WriteCallback, ReplyFuture, ResultFuture, hash};
 
 pub struct ProxyImpl
 {
-    write_cb: Option<Box<WriteCallback>>,
+    write_cb: Option<Box<Mutex<WriteCallback>>>,
     reply_handlers: Arc<Mutex<HashMap<u32, futures::sync::oneshot::Sender<rpc::Reply>>>>, // reply_id, payload
     request_id: u32,
 }
@@ -29,7 +29,7 @@ impl ProxyImpl
     pub fn connect<W>(&mut self, write_cb: W) -> ReplyFuture
         where W: FnMut(Vec<u8>)->Result<(), ::std::io::Error> + 'static + Send
     {
-        self.write_cb = Some(Box::new(write_cb));
+        self.write_cb = Some(Box::new(Mutex::new(write_cb)));
         // Create a "Connect" request
         let mut request = rpc::Request::new();
         request.set_field_type(rpc::Request_Type::CONNECT);
@@ -55,7 +55,8 @@ impl ProxyImpl
 
         match self.write_cb{
             Some(ref mut f) => {
-                f(bytes_vec.unwrap()).expect("ProxyHandler.on_write() failed");
+                use core::ops::DerefMut;
+                f.lock().unwrap().deref_mut()(bytes_vec.unwrap()).expect("ProxyHandler.on_write() failed");
             }
             _ => {}
         }
