@@ -1,5 +1,6 @@
 extern crate core;
 extern crate futures;
+#[macro_use] extern crate log;
 extern crate protobuf;
 
 mod server_impl;
@@ -11,6 +12,7 @@ use std::io;
 pub type FireHandler = Fn(Vec<u8>) -> Result<Vec<u8>, rpc::Status>;
 pub type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
 pub type WriteCallback = FnMut(Vec<u8>)->Result<(), ::std::io::Error> + 'static + Send;
+pub type BroadcastHandler = FnMut(rpc::Broadcast);
 
 pub type ReplyFuture = futures::BoxFuture<rpc::Reply, futures::Canceled>;
 pub type ResultFuture = futures::BoxFuture<Vec<u8>, futures::Canceled>;
@@ -80,9 +82,9 @@ impl Proxy
     }
 
     pub fn fire(&mut self, name: &str, payload: Vec<u8>) -> ResultFuture
-{
-    self._proxy.fire(name, payload)
-}
+    {
+        self._proxy.fire(name, payload)
+    }
 
 /*
     pub fn fire<M, F>(&mut self, name: &str, message: &M, callback: F)
@@ -92,6 +94,12 @@ impl Proxy
         self._proxy.fire(name, message, callback);
     }
     */
+
+    pub fn get_broadcast_handler(&mut self, name: &str) -> futures::sync::mpsc::UnboundedReceiver<rpc::Broadcast>
+    {
+        self._proxy.get_broadcast_handler(name)
+    }
+
     
     // Deliver data from underlying transport to here
     pub fn deliver(&mut self, buf: Vec<u8>) {

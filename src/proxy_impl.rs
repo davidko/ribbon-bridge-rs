@@ -13,6 +13,7 @@ pub struct ProxyImpl
     write_cb: Option<Box<Mutex<WriteCallback>>>,
     reply_handlers: Arc<Mutex<HashMap<u32, futures::sync::oneshot::Sender<rpc::Reply>>>>, // reply_id, payload
     request_id: u32,
+    broadcast_handlers: Arc<Mutex<HashMap<u32, futures::sync::mpsc::UnboundedSender<rpc::Broadcast>>>>,
 }
 
 impl ProxyImpl
@@ -21,6 +22,7 @@ impl ProxyImpl
         let proxy = ProxyImpl {
             write_cb: None,
             reply_handlers: Arc::new(Mutex::new(HashMap::new())),
+            broadcast_handlers: Arc::new(Mutex::new(HashMap::new())),
             request_id: 0,
         };
         proxy
@@ -33,6 +35,7 @@ impl ProxyImpl
         // Create a "Connect" request
         let mut request = rpc::Request::new();
         request.set_field_type(rpc::Request_Type::CONNECT);
+        info!("RPC Connect sending RPC request...");
         self.request(request)
 
     }
@@ -69,6 +72,7 @@ impl ProxyImpl
     // The payload should be a "In" protobuf message
     pub fn fire(&mut self, name: &str, payload: Vec<u8>) -> ResultFuture
     {
+        info!("RPC firing: {}", name);
         let mut request = rpc::Request::new();
         request.set_field_type(rpc::Request_Type::FIRE);
         let mut fire = rpc::Request_Fire::new();
@@ -83,6 +87,15 @@ impl ProxyImpl
                 _ => {vec![]}
             }
         }).boxed()
+    }
+
+    // Set a handler for receiving broadcasts
+    pub fn get_broadcast_handler(&mut self, name: &str) -> futures::sync::mpsc::UnboundedReceiver<rpc::Broadcast> 
+    {
+        let (tx, rx) = futures::sync::mpsc::unbounded();
+        let ref mut map = self.broadcast_handlers.lock().unwrap();
+        map.insert(hash(name), tx);
+        rx
     }
 
     // Deliver bytes from RPC Server to this function
@@ -102,6 +115,13 @@ impl ProxyImpl
             },
             rpc::ServerMessage_Type::BROADCAST => {
                 println!("Received broadcast.");
+                let bcast = msg.take_broadcast();
+                let id = bcast.get_id();
+                let mut hashmap = self.broadcast_handlers.lock().unwrap();
+                if let Some(mut tx) = hashmap.remove(&id) {
+                    futures::sync::mpsc::UnboundedSender::send(&mut tx, bcast);
+                    hashmap.insert(id, tx);
+                }
             },
         }
     }
