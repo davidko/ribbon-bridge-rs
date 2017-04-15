@@ -12,7 +12,7 @@ use std::io;
 pub type FireHandler = Fn(Vec<u8>) -> Result<Vec<u8>, rpc::Status>;
 pub type ReplyHandler = Box<Fn(rpc::Reply) + Send>;
 pub type WriteCallback = FnMut(Vec<u8>)->Result<(), ::std::io::Error> + 'static + Send;
-pub type BroadcastHandler = FnMut(rpc::Broadcast);
+pub type BroadcastHandler = FnMut(Vec<u8>);
 
 pub type ReplyFuture = futures::BoxFuture<rpc::Reply, futures::Canceled>;
 pub type ResultFuture = futures::BoxFuture<Vec<u8>, futures::Canceled>;
@@ -95,9 +95,17 @@ impl Proxy
     }
     */
 
+    /*
     pub fn get_broadcast_handler(&mut self, name: &str) -> futures::sync::mpsc::UnboundedReceiver<rpc::Broadcast>
     {
         self._proxy.get_broadcast_handler(name)
+    }
+    */
+
+    pub fn set_broadcast_handler<F>(&mut self, name: &str, f: F)
+        where F: FnMut(Vec<u8>) + 'static
+    {
+        self._proxy.set_broadcast_handler(name, f)
     }
 
     

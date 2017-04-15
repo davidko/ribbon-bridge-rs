@@ -6,14 +6,16 @@ use rpc;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
-use super::{WriteCallback, ReplyFuture, ResultFuture, hash};
+use super::{WriteCallback, ReplyFuture, ResultFuture, hash, BroadcastHandler};
 
 pub struct ProxyImpl
 {
     write_cb: Option<Box<Mutex<WriteCallback>>>,
     reply_handlers: Arc<Mutex<HashMap<u32, futures::sync::oneshot::Sender<rpc::Reply>>>>, // reply_id, payload
     request_id: u32,
-    broadcast_handlers: Arc<Mutex<HashMap<u32, futures::sync::mpsc::UnboundedSender<rpc::Broadcast>>>>,
+    //broadcast_handlers: Arc<Mutex<HashMap<u32, futures::sync::mpsc::UnboundedSender<rpc::Broadcast>>>>,
+    broadcast_handlers: Arc<Mutex<HashMap<u32, Box<BroadcastHandler>>>>,
+
 }
 
 impl ProxyImpl
@@ -90,12 +92,21 @@ impl ProxyImpl
     }
 
     // Set a handler for receiving broadcasts
+    /*
     pub fn get_broadcast_handler(&mut self, name: &str) -> futures::sync::mpsc::UnboundedReceiver<rpc::Broadcast> 
     {
         let (tx, rx) = futures::sync::mpsc::unbounded();
         let ref mut map = self.broadcast_handlers.lock().unwrap();
         map.insert(hash(name), tx);
         rx
+    }
+    */
+
+    pub fn set_broadcast_handler<F>(&mut self, name: &str, f: F)
+        where F: FnMut(Vec<u8>) + 'static
+    {
+        let ref mut map = self.broadcast_handlers.lock().unwrap();
+        map.insert(hash(name), Box::new(f));
     }
 
     // Deliver bytes from RPC Server to this function
@@ -110,17 +121,17 @@ impl ProxyImpl
                 let mut hashmap = self.reply_handlers.lock().unwrap();
                 if let Some(cb) = hashmap.remove(&id) {
                     println!("Resolving RPC reply future.");
-                    cb.complete(msg.take_reply());
+                    cb.send(msg.take_reply()).unwrap();
                 }
             },
             rpc::ServerMessage_Type::BROADCAST => {
                 println!("Received broadcast.");
-                let bcast = msg.take_broadcast();
+                let mut bcast = msg.take_broadcast();
                 let id = bcast.get_id();
                 let mut hashmap = self.broadcast_handlers.lock().unwrap();
-                if let Some(mut tx) = hashmap.remove(&id) {
-                    futures::sync::mpsc::UnboundedSender::send(&mut tx, bcast);
-                    hashmap.insert(id, tx);
+                if let Some(mut func) = hashmap.remove(&id) {
+                    func(bcast.take_payload());
+                    hashmap.insert(id, func);
                 }
             },
         }
